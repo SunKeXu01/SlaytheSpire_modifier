@@ -19,8 +19,8 @@
 
 请在仓库右侧的 **Releases** 页面下载最新版本：
 
-- `杀戮尖塔助手 v1.0.1.exe`：可直接运行的单文件程序
-- `杀戮尖塔助手 v1.0.1.zip`：包含程序和中文使用说明
+- `SlayTheSpire-Assistant-v1.0.1.exe`：可直接运行的单文件程序
+- `SlayTheSpire-Assistant-v1.0.1.zip`：包含程序和中文使用说明
 
 无需下载或安装额外 DLL。
 
