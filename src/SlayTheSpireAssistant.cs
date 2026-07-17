@@ -14,17 +14,19 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Slay the Spire 单机辅助工具")]
 [assembly: AssemblyCompany("Local Tools")]
 [assembly: AssemblyProduct("杀戮尖塔助手")]
-[assembly: AssemblyVersion("1.0.1.0")]
-[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyVersion("1.0.2.0")]
+[assembly: AssemblyFileVersion("1.0.2.0")]
 
 internal sealed class AssistantForm : Form
 {
-    private const string AppVersion = "1.0.1";
-    private const string PipeName = "STSAssistantBridge_v1_0_1";
+    private const string AppVersion = "1.0.2";
+    private const string PipeName = "STSAssistantBridge_v1_0_2";
     private readonly Label status = new Label();
     private readonly Label detail = new Label();
     private readonly Label version = new Label();
     private readonly NumericUpDown energyAmount = new NumericUpDown();
+    private readonly Button energyLockButton = new Button();
+    private readonly NumericUpDown goldAmount = new NumericUpDown();
     private readonly NumericUpDown healthAmount = new NumericUpDown();
     private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
     private int injectedPid;
@@ -32,6 +34,7 @@ internal sealed class AssistantForm : Form
     private string bridgePath;
     private string logPath;
     private DateTime lastInjectionAttempt = DateTime.MinValue;
+    private bool energyLocked;
 
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
@@ -50,7 +53,7 @@ internal sealed class AssistantForm : Form
     public AssistantForm()
     {
         Text = "杀戮尖塔助手 v" + AppVersion;
-        ClientSize = new Size(450, 310);
+        ClientSize = new Size(450, 360);
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
@@ -66,23 +69,34 @@ internal sealed class AssistantForm : Form
         Controls.Add(status);
 
         energyAmount.SetBounds(318, 65, 96, 30);
-        energyAmount.Minimum = 1; energyAmount.Maximum = 20; energyAmount.Value = 1;
+        energyAmount.Minimum = 1; energyAmount.Maximum = 999; energyAmount.Value = 3;
         Controls.Add(energyAmount);
-        AddButton("增加能量  (F1)", 22, 62, 280, () => Send("ENERGY " + (int)energyAmount.Value));
+        energyLockButton.Text = "锁定能量  (F1)";
+        energyLockButton.SetBounds(22, 62, 280, 36);
+        energyLockButton.Click += (s, e) => ToggleEnergyLock();
+        Controls.Add(energyLockButton);
+        energyAmount.ValueChanged += (s, e) => {
+            if (energyLocked) Send("ENERGY_LOCK " + (int)energyAmount.Value);
+        };
 
-        healthAmount.SetBounds(318, 111, 96, 30);
+        goldAmount.SetBounds(318, 111, 96, 30);
+        goldAmount.Minimum = 0; goldAmount.Maximum = 999999; goldAmount.Value = 999;
+        Controls.Add(goldAmount);
+        AddButton("设置金币  (F4)", 22, 108, 280, () => Send("GOLD " + (int)goldAmount.Value));
+
+        healthAmount.SetBounds(318, 157, 96, 30);
         healthAmount.Minimum = 1; healthAmount.Maximum = 999; healthAmount.Value = 10;
         Controls.Add(healthAmount);
-        AddButton("恢复生命  (F2)", 22, 108, 280, () => Send("HEAL " + (int)healthAmount.Value));
+        AddButton("恢复生命  (F2)", 22, 154, 280, () => Send("HEAL " + (int)healthAmount.Value));
 
-        AddButton("恢复全部生命  (F3)", 22, 154, 392, () => Send("FULL"));
+        AddButton("恢复全部生命  (F3)", 22, 200, 392, () => Send("FULL"));
 
-        detail.SetBounds(22, 207, 405, 48);
+        detail.SetBounds(22, 249, 405, 48);
         detail.ForeColor = Color.DimGray;
         detail.Text = "请先启动游戏并进入一局";
         Controls.Add(detail);
 
-        version.SetBounds(22, 274, 405, 22);
+        version.SetBounds(22, 324, 405, 22);
         version.ForeColor = Color.Gray;
         version.Text = "正式版 v" + AppVersion + " · 仅支持 Windows 64 位 Steam 版";
         Controls.Add(version);
@@ -112,21 +126,52 @@ internal sealed class AssistantForm : Form
         RegisterHotKey(Handle, 1, 0, (uint)Keys.F1);
         RegisterHotKey(Handle, 2, 0, (uint)Keys.F2);
         RegisterHotKey(Handle, 3, 0, (uint)Keys.F3);
+        RegisterHotKey(Handle, 4, 0, (uint)Keys.F4);
     }
 
     protected override void OnHandleDestroyed(EventArgs e)
     {
-        UnregisterHotKey(Handle, 1); UnregisterHotKey(Handle, 2); UnregisterHotKey(Handle, 3);
+        UnregisterHotKey(Handle, 1); UnregisterHotKey(Handle, 2); UnregisterHotKey(Handle, 3); UnregisterHotKey(Handle, 4);
         base.OnHandleDestroyed(e);
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (energyLocked) {
+            string ignored;
+            TryCommand("ENERGY_UNLOCK", out ignored);
+        }
+        base.OnFormClosing(e);
+    }
+
+    private void ToggleEnergyLock()
+    {
+        string command = energyLocked ? "ENERGY_UNLOCK" : "ENERGY_LOCK " + (int)energyAmount.Value;
+        string response;
+        if (!TryCommand(command, out response)) {
+            detail.Text = "尚未连接，请确认游戏已启动";
+            EnsureConnected();
+            return;
+        }
+        Log("命令 " + command + " -> " + response);
+        if (response.StartsWith("OK ")) {
+            energyLocked = !energyLocked;
+            energyLockButton.Text = energyLocked ? "关闭能量锁定  (F1)" : "锁定能量  (F1)";
+            energyLockButton.BackColor = energyLocked ? Color.PaleGreen : SystemColors.Control;
+            SetConnected(response);
+        } else {
+            detail.Text = Friendly(response);
+        }
     }
 
     protected override void WndProc(ref Message m)
     {
         if (m.Msg == 0x0312) {
             int id = m.WParam.ToInt32();
-            if (id == 1) Send("ENERGY " + (int)energyAmount.Value);
+            if (id == 1) ToggleEnergyLock();
             else if (id == 2) Send("HEAL " + (int)healthAmount.Value);
             else if (id == 3) Send("FULL");
+            else if (id == 4) Send("GOLD " + (int)goldAmount.Value);
         }
         base.WndProc(ref m);
     }
@@ -164,6 +209,10 @@ internal sealed class AssistantForm : Form
                 }
                 checkedPid = connectedPid;
                 Log("兼容性检测通过，PID=" + connectedPid);
+                if (energyLocked) {
+                    string lockResponse;
+                    TryCommand("ENERGY_LOCK " + (int)energyAmount.Value, out lockResponse);
+                }
             }
             SetConnected(pong);
             return;
@@ -214,7 +263,7 @@ internal sealed class AssistantForm : Form
         status.Text = "● 已连接《杀戮尖塔》";
         status.ForeColor = Color.SeaGreen;
         if (!String.IsNullOrEmpty(message) && message != "OK CONNECTED") detail.Text = Friendly(message);
-        else if (detail.Text.StartsWith("请先") || detail.Text.StartsWith("启动游戏") || detail.Text.StartsWith("尚未")) detail.Text = "连接正常，可使用按钮或 F1/F2/F3";
+        else if (detail.Text.StartsWith("请先") || detail.Text.StartsWith("启动游戏") || detail.Text.StartsWith("尚未")) detail.Text = "连接正常，可使用按钮或 F1/F2/F3/F4";
     }
 
     private void Send(string command)
@@ -233,6 +282,9 @@ internal sealed class AssistantForm : Form
     private string Friendly(string response)
     {
         if (response.StartsWith("OK ENERGY ")) return "当前能量：" + response.Substring(10);
+        if (response.StartsWith("OK ENERGY_LOCK ")) return "能量已锁定为 " + response.Substring(15);
+        if (response == "OK ENERGY_UNLOCK") return "能量锁定已关闭";
+        if (response.StartsWith("OK GOLD ")) return "当前金币：" + response.Substring(8);
         if (response.StartsWith("OK HEALTH ")) {
             string[] p = response.Substring(10).Split(' ');
             return p.Length == 2 ? "当前生命：" + p[0] + "/" + p[1] : response;
