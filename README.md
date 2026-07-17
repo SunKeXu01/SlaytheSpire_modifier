@@ -18,12 +18,23 @@
 
 ## 下载
 
-请在仓库右侧的 **Releases** 页面下载最新版本：
+当前最新版本为 **v1.0.2**，可从 [GitHub Releases](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/tag/v1.0.2) 下载：
 
-- `SlayTheSpire-Assistant-v1.0.2.exe`：可直接运行的单文件程序
-- `SlayTheSpire-Assistant-v1.0.2.zip`：包含程序和中文使用说明
+- [SlayTheSpire-Assistant-v1.0.2.exe](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/SlayTheSpire-Assistant-v1.0.2.exe)：可直接运行的单文件程序
+- [SlayTheSpire-Assistant-v1.0.2.zip](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/SlayTheSpire-Assistant-v1.0.2.zip)：包含程序和中文使用说明
+- [使用说明.txt](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E.txt)：单独下载中文使用说明
 
 无需下载或安装额外 DLL。
+
+发布文件 SHA-256：
+
+```text
+SlayTheSpire-Assistant-v1.0.2.exe
+06732793F414223A74D9F3AA5293715E2B4655171CA3CE3EE12EEC87CBFED162
+
+SlayTheSpire-Assistant-v1.0.2.zip
+748A7935E262113D897EC65F60F0112F73B084D479DF6462D29DE15AEB32E293
+```
 
 ## 使用方法
 
