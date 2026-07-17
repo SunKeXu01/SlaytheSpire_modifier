@@ -22,7 +22,7 @@
 
 - [SlayTheSpire-Assistant-v1.0.2.exe](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/SlayTheSpire-Assistant-v1.0.2.exe)：可直接运行的单文件程序
 - [SlayTheSpire-Assistant-v1.0.2.zip](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/SlayTheSpire-Assistant-v1.0.2.zip)：包含程序和中文使用说明
-- [使用说明.txt](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E.txt)：单独下载中文使用说明
+- [Instructions-zh-CN.txt](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/Instructions-zh-CN.txt)：单独下载中文使用说明
 
 无需下载或安装额外 DLL。
 
