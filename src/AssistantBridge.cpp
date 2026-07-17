@@ -11,6 +11,8 @@ typedef jint (JNICALL *GetCreatedJavaVMsFn)(JavaVM **, jsize, jsize *);
 // -1 means disabled. A non-negative value is continuously written by the
 // energy lock thread so turn changes and card costs cannot consume it.
 static volatile LONG g_energyLockValue = -1;
+static volatile LONG g_healthLockValue = -1;
+static volatile LONG g_goldLockValue = -1;
 
 static jclass loadClass(JNIEnv *env, const char *name) {
     jclass loaderClass = env->FindClass("java/lang/ClassLoader");
@@ -77,6 +79,32 @@ static void handleCommand(JNIEnv *env, const char *command, char *response, size
         return;
     }
 
+    if (strncmp(command, "HEALTH_LOCK ", 12) == 0) {
+        int value = std::max(1, std::min(999, atoi(command + 12)));
+        InterlockedExchange(&g_healthLockValue, value);
+        _snprintf_s(response, responseSize, _TRUNCATE, "OK HEALTH_LOCK %d", value);
+        return;
+    }
+
+    if (strcmp(command, "HEALTH_UNLOCK") == 0) {
+        InterlockedExchange(&g_healthLockValue, -1);
+        strncpy_s(response, responseSize, "OK HEALTH_UNLOCK", _TRUNCATE);
+        return;
+    }
+
+    if (strncmp(command, "GOLD_LOCK ", 10) == 0) {
+        int value = std::max(0, std::min(999999, atoi(command + 10)));
+        InterlockedExchange(&g_goldLockValue, value);
+        _snprintf_s(response, responseSize, _TRUNCATE, "OK GOLD_LOCK %d", value);
+        return;
+    }
+
+    if (strcmp(command, "GOLD_UNLOCK") == 0) {
+        InterlockedExchange(&g_goldLockValue, -1);
+        strncpy_s(response, responseSize, "OK GOLD_UNLOCK", _TRUNCATE);
+        return;
+    }
+
     jobject player = NULL;
     jclass playerClass = NULL;
     char error[128] = {0};
@@ -85,7 +113,21 @@ static void handleCommand(JNIEnv *env, const char *command, char *response, size
         return;
     }
 
-    if (strncmp(command, "ENERGY ", 7) == 0) {
+    if (strcmp(command, "GOLD_STATUS") == 0 || strncmp(command, "GOLD_SET ", 9) == 0) {
+        jfieldID goldField = env->GetFieldID(playerClass, "gold", "I");
+        if (!goldField) {
+            env->ExceptionClear();
+            strncpy_s(response, responseSize, "ERR GOLD_FIELD", _TRUNCATE);
+        } else {
+            if (strncmp(command, "GOLD_SET ", 9) == 0) {
+                int value = std::max(0, std::min(999999, atoi(command + 9)));
+                env->SetIntField(player, goldField, value);
+            }
+            int current = env->GetIntField(player, goldField);
+            LONG locked = InterlockedCompareExchange(&g_goldLockValue, 0, 0);
+            _snprintf_s(response, responseSize, _TRUNCATE, "OK GOLD_STATUS %d %ld", current, locked);
+        }
+    } else if (strncmp(command, "ENERGY ", 7) == 0) {
         int amount = atoi(command + 7);
         jclass energyPanel = loadClass(env, "com.megacrit.cardcrawl.ui.panels.EnergyPanel");
         jfieldID currentField = energyPanel ? env->GetStaticFieldID(energyPanel, "totalCount", "I") : NULL;
@@ -99,29 +141,6 @@ static void handleCommand(JNIEnv *env, const char *command, char *response, size
             _snprintf_s(response, responseSize, _TRUNCATE, "OK ENERGY %d", next);
         }
         if (energyPanel) env->DeleteLocalRef(energyPanel);
-    } else if (strncmp(command, "GOLD ", 5) == 0) {
-        jfieldID goldField = env->GetFieldID(playerClass, "gold", "I");
-        if (!goldField) {
-            env->ExceptionClear();
-            strncpy_s(response, responseSize, "ERR GOLD_FIELD", _TRUNCATE);
-        } else {
-            int value = std::max(0, std::min(999999, atoi(command + 5)));
-            env->SetIntField(player, goldField, value);
-            _snprintf_s(response, responseSize, _TRUNCATE, "OK GOLD %d", value);
-        }
-    } else if (strncmp(command, "HEAL ", 5) == 0 || strcmp(command, "FULL") == 0) {
-        jfieldID currentField = env->GetFieldID(playerClass, "currentHealth", "I");
-        jfieldID maxField = env->GetFieldID(playerClass, "maxHealth", "I");
-        if (!currentField || !maxField) {
-            env->ExceptionClear();
-            strncpy_s(response, responseSize, "ERR HEALTH_FIELD", _TRUNCATE);
-        } else {
-            int current = env->GetIntField(player, currentField);
-            int maximum = env->GetIntField(player, maxField);
-            int next = strcmp(command, "FULL") == 0 ? maximum : std::min(maximum, current + std::max(0, atoi(command + 5)));
-            env->SetIntField(player, currentField, next);
-            _snprintf_s(response, responseSize, _TRUNCATE, "OK HEALTH %d %d", next, maximum);
-        }
     } else {
         strncpy_s(response, responseSize, "ERR UNKNOWN", _TRUNCATE);
     }
@@ -145,30 +164,71 @@ static bool attachToGameJvm(JavaVM **vm, JNIEnv **env) {
     return (*vm)->AttachCurrentThread((void **)env, NULL) == JNI_OK && *env;
 }
 
-static DWORD WINAPI energyLockThread(LPVOID) {
+static DWORD WINAPI valueLockThread(LPVOID) {
     JavaVM *vm = NULL;
     JNIEnv *env = NULL;
     if (!attachToGameJvm(&vm, &env)) return 1;
 
     jclass energyPanel = NULL;
-    jfieldID currentField = NULL;
+    jfieldID energyField = NULL;
+    jclass dungeon = NULL;
+    jclass playerType = NULL;
+    jfieldID playerField = NULL;
+    jfieldID currentHealthField = NULL;
+    jfieldID maxHealthField = NULL;
+    jfieldID goldField = NULL;
     for (;;) {
-        LONG value = InterlockedCompareExchange(&g_energyLockValue, 0, 0);
-        if (value >= 0) {
+        LONG energyValue = InterlockedCompareExchange(&g_energyLockValue, 0, 0);
+        if (energyValue >= 0) {
             if (!energyPanel) {
                 jclass localClass = loadClass(env, "com.megacrit.cardcrawl.ui.panels.EnergyPanel");
                 if (localClass) {
                     energyPanel = (jclass)env->NewGlobalRef(localClass);
-                    currentField = env->GetStaticFieldID(localClass, "totalCount", "I");
+                    energyField = env->GetStaticFieldID(localClass, "totalCount", "I");
                     env->DeleteLocalRef(localClass);
                 }
                 if (env->ExceptionCheck()) {
                     env->ExceptionClear();
-                    currentField = NULL;
+                    energyField = NULL;
                 }
             }
-            if (energyPanel && currentField) {
-                env->SetStaticIntField(energyPanel, currentField, value);
+            if (energyPanel && energyField) {
+                env->SetStaticIntField(energyPanel, energyField, energyValue);
+                if (env->ExceptionCheck()) env->ExceptionClear();
+            }
+        }
+
+        LONG healthValue = InterlockedCompareExchange(&g_healthLockValue, 0, 0);
+        LONG goldValue = InterlockedCompareExchange(&g_goldLockValue, 0, 0);
+        if (healthValue >= 0 || goldValue >= 0) {
+            if (!dungeon || !playerType) {
+                jclass localDungeon = loadClass(env, "com.megacrit.cardcrawl.dungeons.AbstractDungeon");
+                jclass localPlayerType = loadClass(env, "com.megacrit.cardcrawl.characters.AbstractPlayer");
+                if (localDungeon && localPlayerType) {
+                    dungeon = (jclass)env->NewGlobalRef(localDungeon);
+                    playerType = (jclass)env->NewGlobalRef(localPlayerType);
+                    playerField = env->GetStaticFieldID(localDungeon, "player", "Lcom/megacrit/cardcrawl/characters/AbstractPlayer;");
+                    currentHealthField = env->GetFieldID(localPlayerType, "currentHealth", "I");
+                    maxHealthField = env->GetFieldID(localPlayerType, "maxHealth", "I");
+                    goldField = env->GetFieldID(localPlayerType, "gold", "I");
+                }
+                if (localDungeon) env->DeleteLocalRef(localDungeon);
+                if (localPlayerType) env->DeleteLocalRef(localPlayerType);
+                if (env->ExceptionCheck()) env->ExceptionClear();
+            }
+            if (dungeon && playerField) {
+                jobject player = env->GetStaticObjectField(dungeon, playerField);
+                if (player) {
+                    if (healthValue >= 0 && currentHealthField && maxHealthField) {
+                        int maximum = env->GetIntField(player, maxHealthField);
+                        int next = std::max(1, std::min((int)healthValue, maximum));
+                        env->SetIntField(player, currentHealthField, next);
+                    }
+                    if (goldValue >= 0 && goldField) {
+                        env->SetIntField(player, goldField, goldValue);
+                    }
+                    env->DeleteLocalRef(player);
+                }
                 if (env->ExceptionCheck()) env->ExceptionClear();
             }
         }
@@ -182,7 +242,7 @@ static DWORD WINAPI bridgeThread(LPVOID) {
     if (!attachToGameJvm(&vm, &env)) return 1;
 
     for (;;) {
-        HANDLE pipe = CreateNamedPipeW(L"\\\\.\\pipe\\STSAssistantBridge_v1_0_2",
+        HANDLE pipe = CreateNamedPipeW(L"\\\\.\\pipe\\STSAssistantBridge_v1_0_3_2",
             PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
             1, 512, 512, 0, NULL);
         if (pipe == INVALID_HANDLE_VALUE) break;
@@ -211,8 +271,8 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         DisableThreadLibraryCalls(module);
         HANDLE bridge = CreateThread(NULL, 0, bridgeThread, NULL, 0, NULL);
         if (bridge) CloseHandle(bridge);
-        HANDLE energyLock = CreateThread(NULL, 0, energyLockThread, NULL, 0, NULL);
-        if (energyLock) CloseHandle(energyLock);
+        HANDLE valueLock = CreateThread(NULL, 0, valueLockThread, NULL, 0, NULL);
+        if (valueLock) CloseHandle(valueLock);
     }
     return TRUE;
 }
