@@ -1,6 +1,6 @@
 # 杀戮尖塔助手
 
-一个适用于 Windows 64 位 Steam 版《杀戮尖塔》的单机辅助工具。游戏启动后运行助手，即可锁定当前可用能量、设置金币或恢复角色生命值。
+一个适用于 Windows 64 位 Steam 版《杀戮尖塔》的单机辅助工具。游戏启动后运行助手，即可锁定当前可用能量、生命值与金币。
 
 > 本工具仅用于单机游戏。请勿用于任何带有竞技、公平排名或多人对战性质的场景。
 
@@ -8,39 +8,38 @@
 
 - 自动识别已经启动的《杀戮尖塔》进程
 - 将当前可用能量持续锁定为设定值（跨回合自动维持）
-- 将金币直接设置为指定值
-- 恢复指定数量的生命值
-- 一键恢复全部生命值
-- 可在界面中调整能量、金币和恢复生命的数值
+- 将金币持续锁定为指定值
+- 将生命值持续锁定为设定值（不会超过角色最大生命）
+- 可在界面中调整能量、金币和生命锁定数值
 - 自动检查游戏内部结构是否兼容
 - 防止助手重复启动
 - 记录连接和错误日志，方便排查问题
 
 ## 下载
 
-当前最新版本为 **v1.0.2**，可从 [GitHub Releases](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/tag/v1.0.2) 下载：
+当前最新版本为 **v1.0.3**，可从 [GitHub Releases](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/tag/v1.0.3) 下载：
 
-- [SlayTheSpire-Assistant-v1.0.2.exe](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/SlayTheSpire-Assistant-v1.0.2.exe)：可直接运行的单文件程序
-- [SlayTheSpire-Assistant-v1.0.2.zip](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/SlayTheSpire-Assistant-v1.0.2.zip)：包含程序和中文使用说明
-- [Instructions-zh-CN.txt](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.2/Instructions-zh-CN.txt)：单独下载中文使用说明
+- [SlayTheSpire-Assistant-v1.0.3.exe](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.3/SlayTheSpire-Assistant-v1.0.3.exe)：可直接运行的单文件程序
+- [SlayTheSpire-Assistant-v1.0.3.zip](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.3/SlayTheSpire-Assistant-v1.0.3.zip)：包含程序和中文使用说明
+- [Instructions-zh-CN.txt](https://github.com/SunKeXu01/SlaytheSpire_modifier/releases/download/v1.0.3/Instructions-zh-CN.txt)：单独下载中文使用说明
 
 无需下载或安装额外 DLL。
 
 发布文件 SHA-256：
 
 ```text
-SlayTheSpire-Assistant-v1.0.2.exe
-06732793F414223A74D9F3AA5293715E2B4655171CA3CE3EE12EEC87CBFED162
+SlayTheSpire-Assistant-v1.0.3.exe
+8EB14C64251163AAB7A4774D745B64AF3D0E2B0E7F263518CA8A9570DE9B111F
 
-SlayTheSpire-Assistant-v1.0.2.zip
-748A7935E262113D897EC65F60F0112F73B084D479DF6462D29DE15AEB32E293
+SlayTheSpire-Assistant-v1.0.3.zip
+C8149DD6E9C901B2B06BEEC25ADAAAF073945EADEDC0290BF3FA79BD34FDB06E
 ```
 
 ## 使用方法
 
 1. 启动 Steam 版《杀戮尖塔》。
 2. 进入一局游戏，最好停留在战斗中轮到玩家出牌的画面。
-3. 双击运行 `杀戮尖塔助手 v1.0.2.exe`。
+3. 双击运行 `杀戮尖塔助手 v1.0.3.exe`。
 4. 等待界面显示“已连接《杀戮尖塔》”。
 5. 点击界面按钮或使用快捷键。
 
@@ -49,9 +48,8 @@ SlayTheSpire-Assistant-v1.0.2.zip
 | 快捷键 | 功能 |
 | --- | --- |
 | `F1` | 开启或关闭能量锁定 |
-| `F2` | 按界面设定值恢复生命 |
-| `F3` | 恢复全部生命 |
-| `F4` | 将金币设置为界面中的数值 |
+| `F2` | 开启或关闭生命值锁定 |
+| `F4` | 开启或关闭金币锁定 |
 
 ## 能量数值说明
 
@@ -125,6 +123,13 @@ src/SlayTheSpireAssistant.cs     Windows 界面、进程识别与快捷键
 连接组件被作为资源嵌入最终 EXE，运行时会释放到系统临时目录，所以分发时只需要发送一个 EXE。
 
 ## 版本记录
+
+### v1.0.3
+
+- 将“恢复生命”和“恢复全部生命”合并为可开关的生命值锁定
+- 受到伤害后自动恢复到设定值，设定值不会超过角色最大生命
+- 金币改为可开关的固定值锁定，消费或获得金币后自动恢复
+- 移除 F3，F2 改为开启或关闭生命值锁定
 
 ### v1.0.2
 
